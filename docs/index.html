@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Type a truth table and get a verified Toffoli circuit (K-map-guided Toffoli synthesis, ICEE 2026).">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Truth Table to Toffoli</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout: a two-pane workbench, truth table on the left, circuit and numbers on the right; stacks below 980px. */
+:root {
+  --ground: #FBFAF6; --surface: #FFFFFF; --ink: #16181D; --muted: #4F5560; --rule: #D9D5CC;
+  --accent: #1F5EA0; --accent-soft: #E6EEF7; --accent-ink: #FFFFFF; --x: #A8540F; --good: #1E6B3A; --good-soft: #DCEFE2; --bad: #A12A2A; --bad-soft: #F7E1E1;
+  --wire: #2A2E35; --gate-fill: #FFFFFF;
+  --f-display: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --f-body: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
+  --f-mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --ground: #121418; --surface: #1A1D22; --ink: #E7E9EC; --muted: #A3A9B2; --rule: #343941;
+  --accent: #79AEE6; --accent-soft: #1E2B3A; --accent-ink: #0E1724; --x: #E39B5E; --good: #7FCB98; --good-soft: #17301F; --bad: #EE8E8E; --bad-soft: #3A1C1C;
+  --wire: #C9CED6; --gate-fill: #1A1D22; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --ground: #121418; --surface: #1A1D22; --ink: #E7E9EC; --muted: #A3A9B2; --rule: #343941;
+  --accent: #79AEE6; --accent-soft: #1E2B3A; --accent-ink: #0E1724; --x: #E39B5E; --good: #7FCB98; --good-soft: #17301F; --bad: #EE8E8E; --bad-soft: #3A1C1C;
+  --wire: #C9CED6; --gate-fill: #1A1D22; color-scheme: dark }
+body { background: var(--ground); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.5; }
+.wrap { max-width: 1320px; margin: 0 auto; padding-block: 32px 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 28px; }
+header { display: flex; flex-direction: column; gap: 8px; border-bottom: 2px solid var(--ink); padding-bottom: 20px; }
+.kicker { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+h1 { margin: 0; font-family: var(--f-display); font-weight: 700; font-size: clamp(30px, 4.4vw, 46px); line-height: 1.08; text-wrap: balance; }
+.lede { margin: 0; max-width: 70ch; color: var(--muted); }
+.lede a, footer a { color: var(--accent); }
+h2 { margin: 0; font-family: var(--f-display); font-weight: 600; font-size: 22px; line-height: 1.2; }
+.grid { display: grid; grid-template-columns: minmax(0, 400px) minmax(0, 1fr); gap: 32px; align-items: start; }
+@media (max-width: 980px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.pane { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+label, .label { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+input[type=text], select, textarea { font: 15px/1.4 var(--f-mono); color: var(--ink); background: var(--surface); border: 1.5px solid var(--rule); border-radius: 8px; padding: 9px 11px; width: 100%; box-sizing: border-box; }
+select { font-family: var(--f-body); }
+textarea { resize: vertical; min-height: 84px; }
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.hint { font-size: 13px; color: var(--muted); margin: 0; }
+.err { font-size: 13px; color: var(--bad); margin: 0; }
+.tt-wrap { max-height: 460px; overflow: auto; border: 1.5px solid var(--rule); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.tt { width: 100%; font-family: var(--f-mono); font-size: 14px; }
+.tt th { position: sticky; top: 0; background: var(--surface); font-family: var(--f-body); font-size: 12px; font-weight: 600; color: var(--muted); padding: 8px 6px; border-bottom: 1.5px solid var(--rule); text-align: center; }
+.tt td { padding: 2px 6px; text-align: center; border-bottom: 1px solid var(--rule); }
+.tt td.idx { color: var(--muted); font-size: 12px; text-align: right; padding-right: 10px; }
+.tt td.in { color: var(--muted); }
+.tt .sep { border-left: 1.5px solid var(--rule); }
+.bit { font: 500 14px var(--f-mono); width: 34px; height: 28px; border-radius: 6px; border: 1.5px solid var(--rule); background: var(--surface); color: var(--muted); cursor: pointer; }
+.bit[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.bit:hover { border-color: var(--accent); }
+.btn { font: 600 14px var(--f-body); padding: 9px 14px; border-radius: 8px; border: 1.5px solid var(--accent); background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--accent); }
+.seg { display: inline-flex; border: 1.5px solid var(--accent); border-radius: 9px; overflow: hidden; flex-wrap: wrap; }
+.seg button { font: 600 14px var(--f-body); padding: 8px 14px; border: 0; background: transparent; color: var(--accent); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.toolbar { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; justify-content: space-between; }
+.stats { display: flex; flex-wrap: wrap; gap: 10px 28px; align-items: baseline; }
+.stat { display: flex; flex-direction: column; }
+.stat b { font-family: var(--f-display); font-size: 34px; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.chip { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; padding: 5px 10px; border-radius: 999px; }
+.chip.ok { background: var(--good-soft); color: var(--good); }
+.chip.no { background: var(--bad-soft); color: var(--bad); }
+.chip.busy { background: var(--accent-soft); color: var(--accent); }
+.card { background: var(--surface); border: 1.5px solid var(--rule); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.circ { overflow-x: auto; }
+.circ svg { display: block; }
+.cands { width: 100%; font-size: 14px; }
+.cands th { text-align: left; font-size: 12px; font-weight: 600; color: var(--muted); padding: 6px 8px; border-bottom: 1.5px solid var(--rule); }
+.cands td { padding: 6px 8px; border-bottom: 1px solid var(--rule); }
+.cands td.num, .cands th.num { text-align: right; }
+.cands tr.pick td { background: var(--accent-soft); font-weight: 600; }
+.tag { font-size: 12px; color: var(--muted); }
+pre { margin: 0; font: 13px/1.5 var(--f-mono); background: var(--ground); border: 1.5px solid var(--rule); border-radius: 8px; padding: 12px 14px; overflow: auto; max-height: 320px; }
+.cardhead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+footer { border-top: 1.5px solid var(--rule); padding-top: 16px; font-size: 14px; color: var(--muted); display: flex; flex-direction: column; gap: 6px; max-width: 90ch; }
+@media (prefers-reduced-motion: no-preference) { .chip.busy::before { content: ""; width: 10px; height: 10px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+.circ .w { stroke: var(--wire); stroke-width: 1.6; }
+.circ .wl { fill: var(--ink); font: 14px var(--f-mono); }
+.circ .cd { fill: var(--wire); }
+.circ .tg { fill: var(--gate-fill); stroke: var(--wire); stroke-width: 1.6; }
+.circ .xg { fill: var(--gate-fill); stroke: var(--x); stroke-width: 1.8; }
+.circ .xt { fill: var(--x); font: 600 13px var(--f-mono); }
+code { font-family: var(--f-mono); font-size: .95em; }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="kicker">K-map-guided Toffoli synthesis · ICEE 2026</div>
+  <h1>Truth Table to Toffoli</h1>
+  <p class="lede">Enter a truth table and get a reversible circuit of X, CNOT and multi-controlled Toffoli gates that computes it, checked on every input row. It runs the method of the paper by A. Akhtar, ported from the <a href="https://github.com/ArhamAkhtarAlam/toffoli-synthesis-final-paper" target="_blank" rel="noopener">reference code</a>.</p>
+</header>
+
+<div class="grid">
+  <section class="pane" aria-label="Truth table">
+    <h2>Truth table</h2>
+    <div class="field">
+      <label for="preset">Start from</label>
+      <select id="preset"></select>
+    </div>
+    <div class="row2">
+      <div class="field"><label for="ins">Inputs (1–8)</label><input type="text" id="ins" spellcheck="false" autocomplete="off"></div>
+      <div class="field"><label for="outs">Outputs (1–8)</label><input type="text" id="outs" spellcheck="false" autocomplete="off"></div>
+    </div>
+    <p class="hint">Names separated by spaces. The first input is the most significant bit of the row number.</p>
+    <p class="err" id="name-err" hidden></p>
+    <div class="label">Click an output cell to switch it between 0 and 1</div>
+    <div class="tt-wrap"><table class="tt" id="tt"></table></div>
+    <div class="field">
+      <label for="cols">Or type each output column</label>
+      <textarea id="cols" spellcheck="false"></textarea>
+      <p class="hint">One line per output: <code>Name: bits</code>, the bits for rows 0, 1, 2, … in order.</p>
+      <p class="err" id="cols-err" hidden></p>
+      <div><button class="btn ghost" id="apply" type="button">Apply columns</button></div>
+    </div>
+  </section>
+
+  <section class="pane" aria-label="Circuit">
+    <div class="toolbar">
+      <div class="seg" role="group" aria-label="Method">
+        <button type="button" id="m-hyb" aria-pressed="true">Hybrid</button>
+        <button type="button" id="m-dis" aria-pressed="false">Disjoint only</button>
+      </div>
+      <span class="chip busy" id="status">Synthesizing…</span>
+    </div>
+    <p class="hint" id="mode-note"></p>
+    <div class="stats" id="stats"></div>
+    <div class="card">
+      <div class="cardhead"><h2>Circuit</h2><span class="tag" id="legend">● control · ⊕ target · X flips the wire</span></div>
+      <div class="circ" id="circ"></div>
+    </div>
+    <div class="card">
+      <div class="cardhead"><h2>Candidates</h2><span class="tag">gates and quantum cost after X-cancellation</span></div>
+      <div style="overflow-x: auto"><table class="cands" id="cands"></table></div>
+      <p class="hint">Every candidate is checked on all input rows. Hybrid keeps the candidate with the fewest gates among those no worse than the disjoint one in both gates and quantum cost. The paper's final step, choosing by CZ count after transpiling to an IBM device model, needs Qiskit and is not run here.</p>
+    </div>
+    <div class="card">
+      <div class="cardhead"><h2>Qiskit</h2><button class="btn ghost" id="copy" type="button">Copy code</button></div>
+      <pre id="qiskit"></pre>
+    </div>
+  </section>
+</div>
+
+<footer>
+  <span>Quantum cost of a Toffoli with k controls: 2<sup>k+1</sup> − 3 (1 for X and CNOT). Circuits are out-of-place: inputs are kept, each output starts at |0⟩, and any helper qubit ends at |0⟩.</span>
+  <span>Disjoint only: Algorithm 1's groups never overlap, so Theorems 1–2 prove the circuit correct. Hybrid also tries overlapping Reed–Muller covers, correct by the same parity rule (Theorem 2) and the merging lemma.</span>
+</footer>
+</div>
+
+<script id="synth">
+// JavaScript port of code/disjoint_synth.py, gatelevel.py, synth_full.py, ordering.py and improve.py
+// (toffoli-synthesis-final-paper). Points are integers, input 0 = most significant bit; a pattern is
+// an array over {0, 1, -1} (-1 = dash). Gate: ['X', w] or ['MCX', [controls], target].
+const Synth = (() => {
+  const key = p => p.join(',');
+  function cubeCells(p, n) {
+    let base = 0; const free = [];
+    for (let i = 0; i < n; i++) { if (p[i] === -1) free.push(n - 1 - i); else if (p[i] === 1) base |= 1 << (n - 1 - i); }
+    const out = [];
+    for (let k = 0; k < 1 << free.length; k++) {
+      let x = base;
+      for (let f = 0; f < free.length; f++) if (k >> (free.length - 1 - f) & 1) x |= 1 << free[f];
+      out.push(x);
+    }
+    return out;
+  }
+  const toPat = (x, n) => Array.from({ length: n }, (_, i) => x >> (n - 1 - i) & 1);
+  function grow(seed, remaining, order, n) {
+    let p = toPat(seed, n);
+    for (const i of order) {
+      if (p[i] === -1) continue;
+      const t = p.slice(); t[i] = -1;
+      if (cubeCells(t, n).every(c => remaining.has(c))) p = t;
+    }
+    return p;
+  }
+  const minOf = s => { let m = Infinity; for (const x of s) if (x < m) m = x; return m; };
+  const maxOf = s => { let m = -Infinity; for (const x of s) if (x > m) m = x; return m; };
+  function disjoint(S, n, order, pick) {
+    const rem = new Set(S), out = [];
+    while (rem.size) {
+      const p = grow(pick(rem), rem, order, n);
+      out.push(p);
+      for (const c of cubeCells(p, n)) rem.delete(c);
+    }
+    return out;
+  }
+  const range = n => Array.from({ length: n }, (_, i) => i);
+  const disjointCover = (S, n) => disjoint(S, n, range(n), minOf); // Algorithm 1
+  function permutations(a) {
+    if (a.length <= 1) return [a.slice()];
+    const out = [];
+    a.forEach((x, i) => { for (const r of permutations(a.slice(0, i).concat(a.slice(i + 1)))) out.push([x].concat(r)); });
+    return out;
+  }
+  function orders(n) {
+    if (n <= 4) return permutations(range(n));
+    const base = range(n), rot = k => base.slice(k).concat(base.slice(0, k));
+    return range(n).map(rot).concat(range(n).map(k => rot(k).reverse()));
+  }
+  const disjointCovers = (S, n) => orders(n).flatMap(o => [disjoint(S, n, o, minOf), disjoint(S, n, o, maxOf)]);
+  function fprmCovers(S, n) {
+    const out = [], N = 1 << n;
+    for (let pol = 0; pol < N; pol++) {
+      const g = range(N).map(x => S.has(x ^ pol) ? 1 : 0);
+      for (let i = 0; i < n; i++) { const step = 1 << (n - 1 - i); for (let k = 0; k < N; k++) if (k & step) g[k] ^= g[k ^ step]; }
+      const terms = [];
+      for (let k = 0; k < N; k++) if (g[k]) terms.push(range(n).map(i => (k >> (n - 1 - i) & 1) ? ((pol >> (n - 1 - i) & 1) ? 0 : 1) : -1));
+      out.push(terms);
+    }
+    return out;
+  }
+  function third(a, b) { const s = new Set([a, b]); return s.has(0) && s.has(1) ? -1 : s.has(1) ? 0 : 1; }
+  function merge(terms) {
+    const ts = terms.map(t => t.slice());
+    let changed = true;
+    while (changed) {
+      changed = false;
+      outer: for (let a = 0; a < ts.length; a++) for (let b = a + 1; b < ts.length; b++) {
+        const d = [];
+        for (let i = 0; i < ts[a].length && d.length < 2; i++) if (ts[a][i] !== ts[b][i]) d.push(i);
+        if (d.length > 1) continue;
+        if (!d.length) { ts.splice(b, 1); ts.splice(a, 1); }
+        else { const t = ts[a].slice(); t[d[0]] = third(ts[a][d[0]], ts[b][d[0]]); ts.splice(b, 1); ts[a] = t; }
+        changed = true; break outer;
+      }
+    }
+    return ts;
+  }
+  function emitTerm(p, target) {
+    const ctrls = [], comp = [];
+    p.forEach((v, i) => { if (v !== -1) { ctrls.push(i); if (v === 0) comp.push(i); } });
+    return comp.map(w => ['X', w]).concat([['MCX', ctrls, target]], comp.map(w => ['X', w]));
+  }
+  const termLen = t => emitTerm(t, 0).length;
+  const coverCost = (S, n, cover) => cover(S, n).reduce((a, t) => a + termLen(t), 0);
+  function cancelledLen(gates) {
+    const par = new Map(); let out = 0;
+    for (const g of gates) {
+      if (g[0] === 'X') par.set(g[1], (par.get(g[1]) || 0) ^ 1);
+      else { out++; for (const c of g[1]) { out += par.get(c) || 0; par.delete(c); } }
+    }
+    for (const v of par.values()) out += v;
+    return out;
+  }
+  function cancelXX(gates) {
+    gates = gates.slice();
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (let i = 0; i < gates.length && !changed; i++) {
+        if (gates[i][0] !== 'X') continue;
+        const w = gates[i][1];
+        for (let j = i + 1; j < gates.length; j++) {
+          const h = gates[j];
+          if (h[0] === 'X' && h[1] === w) { gates.splice(j, 1); gates.splice(i, 1); changed = true; break; }
+          if (h[0] !== 'X' && h[1].includes(w)) break;
+        }
+      }
+    }
+    return gates;
+  }
+  const qcost = g => g[0] === 'X' ? 1 : (g[1].length <= 1 ? 1 : 2 ** (g[1].length + 1) - 3);
+  const flat = blocks => blocks.flat();
+  const xor = (a, b) => { const s = new Set(a); for (const x of b) s.has(x) ? s.delete(x) : s.add(x); return s; };
+  const cmpPat = (a, b) => { for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] - b[i]; return 0; };
+  function emitBlocks(plan, order, n, m, shared) {
+    const blocks = [], done = new Set(); let nanc = 0;
+    for (const j of order) {
+      const tg = n + j;
+      if (plan[j][0] !== null) blocks.push([['MCX', [n + plan[j][0]], tg]]);
+      for (const t of plan[j][1]) {
+        const k = key(t);
+        if (shared.has(k)) {
+          if (done.has(k)) continue;
+          done.add(k);
+          const a = n + m + nanc; nanc++;
+          blocks.push(emitTerm(t, a).concat(shared.get(k).map(jj => ['MCX', [a], n + jj]), emitTerm(t, a)));
+        } else blocks.push(emitTerm(t, tg));
+      }
+    }
+    return [blocks, nanc];
+  }
+  function shareCandidates(plan, m) {
+    const use = new Map(), pats = new Map();
+    for (let j = 0; j < m; j++) for (const t of plan[j][1]) {
+      if (t.filter(v => v !== -1).length >= 2) { const k = key(t); if (!use.has(k)) { use.set(k, []); pats.set(k, t); } use.get(k).push(j); }
+    }
+    return [...use.keys()].sort((a, b) => cmpPat(pats.get(a), pats.get(b))).filter(k => use.get(k).length >= 2).map(k => [k, pats.get(k), use.get(k)]);
+  }
+  // returns [blocks, nanc]
+  function synthesize(outs, n, o = {}) {
+    const { share = true, derive = true, aware = true, fallback = true, cover = disjointCover } = o;
+    const m = outs.length, direct = outs.map(s => coverCost(s, n, cover));
+    const order = range(m).sort((a, b) => direct[a] - direct[b] || a - b);
+    const plan = {};
+    if (!aware) {
+      order.forEach((j, idx) => {
+        let best = direct[j], base = null, S = outs[j];
+        if (derive) for (const i of order.slice(0, idx)) {
+          const d = xor(outs[j], outs[i]), c = 1 + coverCost(d, n, cover);
+          if (c < best) { best = c; base = i; S = d; }
+        }
+        plan[j] = [base, cover(S, n)];
+      });
+      const shared = new Map();
+      if (share) for (const [k, t, js] of shareCandidates(plan, m)) if (2 * termLen(t) + js.length < js.length * termLen(t)) shared.set(k, js);
+      return emitBlocks(plan, order, n, m, shared);
+    }
+    let prefix = [];
+    order.forEach((j, idx) => {
+      const cands = [[null, outs[j]]];
+      if (derive) for (const i of order.slice(0, idx)) cands.push([i, xor(outs[j], outs[i])]);
+      let best = null;
+      for (const [base, S] of cands) {
+        const terms = cover(S, n);
+        const block = (base !== null ? [['MCX', [n + base], n + j]] : []).concat(terms.flatMap(t => emitTerm(t, n + j)));
+        const c = cancelledLen(prefix.concat(block));
+        if (best === null || c < best[0]) best = [c, base, terms, block];
+      }
+      plan[j] = [best[1], best[2]];
+      prefix = prefix.concat(best[3]);
+    });
+    let shared = new Map();
+    if (share) {
+      let cur = cancelledLen(flat(emitBlocks(plan, order, n, m, shared)[0]));
+      for (const [k, , js] of shareCandidates(plan, m)) {
+        const trial = new Map(shared); trial.set(k, js);
+        const c = cancelledLen(flat(emitBlocks(plan, order, n, m, trial)[0]));
+        if (c < cur) { shared = trial; cur = c; }
+      }
+    }
+    let res = emitBlocks(plan, order, n, m, shared);
+    if (fallback && (share || derive)) {
+      for (const kw of [{ share: false, derive: false }, { share, derive, aware: false }]) {
+        const alt = synthesize(outs, n, Object.assign({ cover }, kw));
+        if (cancelledLen(flat(alt[0])) < cancelledLen(flat(res[0]))) res = alt;
+      }
+    }
+    return res;
+  }
+  // ordering.py
+  function wires(block) {
+    const rd = new Set(), wr = new Set();
+    for (const g of block) if (g[0] === 'MCX') { g[1].forEach(c => rd.add(c)); wr.add(g[2]); }
+    for (const w of wr) rd.delete(w);
+    return [rd, wr];
+  }
+  function precedence(blocks, n) {
+    const io = blocks.map(wires);
+    return blocks.map((_, b) => new Set(range(blocks.length).filter(a => a !== b && [...io[b][0]].some(r => r >= n && io[a][1].has(r)))));
+  }
+  const valid = (seq, pred) => { const pos = new Map(seq.map((b, i) => [b, i])); return seq.every(b => [...pred[b]].every(a => pos.get(a) < pos.get(b))); };
+  const seqCost = (seq, blocks) => cancelledLen(seq.flatMap(b => blocks[b]));
+  function greedy(blocks, pred) {
+    const seq = [], left = new Set(range(blocks.length));
+    while (left.size) {
+      const placed = new Set(seq);
+      const ready = [...left].filter(b => [...pred[b]].every(a => placed.has(a))).sort((a, b) => a - b);
+      let best = null, bc = Infinity;
+      for (const b of ready) { const c = seqCost(seq.concat([b]), blocks); if (c < bc) { bc = c; best = b; } }
+      seq.push(best); left.delete(best);
+    }
+    return seq;
+  }
+  function localSearch(seq, blocks, pred) {
+    seq = seq.slice(); let best = seqCost(seq, blocks), improved = true;
+    while (improved) {
+      improved = false;
+      outer: for (let i = 0; i < seq.length; i++) for (let k = 0; k < seq.length; k++) {
+        if (k === i) continue;
+        const s = seq.slice(0, i).concat(seq.slice(i + 1)); s.splice(k, 0, seq[i]);
+        if (!valid(s, pred)) continue;
+        const c = seqCost(s, blocks);
+        if (c < best) { seq = s; best = c; improved = true; break outer; }
+      }
+    }
+    return seq;
+  }
+  function heuristic(blocks, n) {
+    const pred = precedence(blocks, n);
+    const seqs = [range(blocks.length), greedy(blocks, pred)].map(s => localSearch(s, blocks, pred));
+    let seq = seqs[0];
+    if (seqCost(seqs[1], blocks) < seqCost(seq, blocks)) seq = seqs[1];
+    return seq.map(b => blocks[b]);
+  }
+  function ordered(outs, n, kw = {}) {
+    const cov = kw.cover ? { cover: kw.cover } : {};
+    const sh = kw.share ?? true, de = kw.derive ?? true;
+    const confs = !(sh || de) ? [Object.assign({}, cov, { share: false, derive: false })]
+      : [Object.assign({}, kw, { fallback: false }), Object.assign({}, cov, { share: false, derive: false }), Object.assign({}, kw, { aware: false })];
+    let best = null;
+    for (const c of confs) {
+      const [blocks, nanc] = synthesize(outs, n, c);
+      const g = flat(heuristic(blocks, n));
+      if (best === null || cancelledLen(g) < cancelledLen(best[0])) best = [g, nanc];
+    }
+    return best;
+  }
+  // improve.py
+  function score(g) { g = cancelXX(g); return [g.length, g.reduce((a, x) => a + qcost(x), 0)]; }
+  const lt = (a, b) => a[0] < b[0] || (a[0] === b[0] && a[1] < b[1]);
+  const termCost = (terms, n) => score(terms.flatMap(t => emitTerm(t, n)));
+  function makeCover(kind, by) {
+    const cache = new Map();
+    return (S, n) => {
+      const k = n + ':' + [...S].sort((a, b) => a - b).join(',');
+      if (!cache.has(k)) {
+        let cands = disjointCovers(S, n);
+        if (kind !== 'multistart') {
+          cands = cands.concat(fprmCovers(S, n));
+          cands = cands.map(merge).concat(kind === 'esop' ? cands : []);
+        }
+        let best = null, bk = null;
+        for (const c of cands) {
+          let s = termCost(c, n); if (by === 'qcost') s = [s[1], s[0]];
+          if (best === null || lt(s, bk)) { best = c; bk = s; }
+        }
+        cache.set(k, best);
+      }
+      return cache.get(k);
+    };
+  }
+  function covers() {
+    const out = [];
+    for (const kind of ['multistart', 'esop', 'esopm']) for (const by of ['gates', 'qcost']) out.push([kind + '-' + by, makeCover(kind, by)]);
+    return out;
+  }
+  function candidates(outs, n) {
+    const out = [['disjoint', ...ordered(outs, n)]];
+    for (const [name, cover] of covers()) out.push([name, ...ordered(outs, n, { cover })]);
+    return out;
+  }
+  function improve(outs, n, cands = candidates(outs, n)) {
+    const p = score(cands[0][1]);
+    let best = null, bs = null;
+    for (const c of cands) {
+      const s = score(c[1]);
+      if (s[0] <= p[0] && s[1] <= p[1] && (best === null || lt(s, bs))) { best = c; bs = s; }
+    }
+    return best;
+  }
+  function simulate(gates, x, width) {
+    const s = new Array(width).fill(0);
+    for (const [g, w] of x.entries()) s[g] = w;
+    for (const g of gates) {
+      if (g[0] === 'X') s[g[1]] ^= 1;
+      else if (g[1].every(c => s[c])) s[g[2]] ^= 1;
+    }
+    return s;
+  }
+  function verify(gates, n, outs, nanc) {
+    const m = outs.length, width = n + m + nanc;
+    for (let x = 0; x < 1 << n; x++) {
+      const bits = toPat(x, n), s = simulate(gates, bits, width);
+      for (let i = 0; i < n; i++) if (s[i] !== bits[i]) return false;
+      for (let j = 0; j < m; j++) if (s[n + j] !== (outs[j].has(x) ? 1 : 0)) return false;
+      for (let k = 0; k < nanc; k++) if (s[n + m + k]) return false;
+    }
+    return true;
+  }
+  return { disjointCover, ordered, candidates, improve, score, cancelXX, cancelledLen, qcost, verify, synthesize };
+})();
+if (typeof module !== 'undefined') module.exports = Synth;
+</script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const LABELS = {
+    'disjoint': ['Disjoint (Algorithm 1)', 'disjoint'],
+    'multistart-gates': ['Disjoint, other orders, by gates', 'disjoint'],
+    'multistart-qcost': ['Disjoint, other orders, by cost', 'disjoint'],
+    'esop-gates': ['Reed–Muller and disjoint, by gates', 'may overlap'],
+    'esop-qcost': ['Reed–Muller and disjoint, by cost', 'may overlap'],
+    'esopm-gates': ['Merged covers only, by gates', 'may overlap'],
+    'esopm-qcost': ['Merged covers only, by cost', 'may overlap'],
+  };
+  const maj = (a, b, c) => (a & b) | (b & c) | (a & c);
+  const PRESETS = [
+    ['Full adder', 'A B Cin', 'Sum Carry', (a, b, c) => [a ^ b ^ c, maj(a, b, c)]],
+    ['Half adder', 'A B', 'Sum Carry', (a, b) => [a ^ b, a & b]],
+    ['Majority of three', 'A B C', 'M', (a, b, c) => [maj(a, b, c)]],
+    ['OR', 'A B', 'Out', (a, b) => [a | b]],
+    ['4-input parity', 'A B C D', 'P', (a, b, c, d) => [a ^ b ^ c ^ d]],
+    ['2-bit ripple adder', 'A1 A0 B1 B0 Cin', 'S0 C0 S1 Cout', (a1, a0, b1, b0, c) => {
+      const s0 = a0 ^ b0 ^ c, c0 = maj(a0, b0, c); return [s0, c0, a1 ^ b1 ^ c0, maj(a1, b1, c0)]; }],
+    ['2-bit multiplier', 'X1 X0 Y1 Y0', 'P3 P2 P1 P0', (x1, x0, y1, y0) => {
+      const p = (2 * x1 + x0) * (2 * y1 + y0); return [p >> 3 & 1, p >> 2 & 1, p >> 1 & 1, p & 1]; }],
+    ['BCD to Excess-3', 'B3 B2 B1 B0', 'E3 E2 E1 E0', (...b) => {
+      const v = 8 * b[0] + 4 * b[1] + 2 * b[2] + b[3]; if (v > 9) return [0, 0, 0, 0];
+      const e = v + 3; return [e >> 3 & 1, e >> 2 & 1, e >> 1 & 1, e & 1]; }],
+    ['3_17 (RevLib)', 'a b c', 'f1 f2 f3', (a, b, c) => [[1,1,1],[0,0,0],[0,0,1],[0,1,1],[1,0,0],[0,1,0],[1,1,0],[1,0,1]][4 * a + 2 * b + c]],
+    ['4-bit equality', 'A3 A2 A1 A0 B3 B2 B1 B0', 'EQ', (...x) => [+(x.slice(0, 4).join('') === x.slice(4).join(''))]],
+  ];
+  const state = { ins: [], outs: [], cols: [], mode: 'hyb', result: null };
+  const bitsOf = (x, n) => Array.from({ length: n }, (_, i) => x >> (n - 1 - i) & 1);
+
+  // ---------- presets ----------
+  const sel = $('preset');
+  PRESETS.forEach(([name], i) => sel.add(new Option(name, String(i))));
+  sel.add(new Option('Custom', 'custom'));
+  function loadPreset(i) {
+    const [, ins, outs, f] = PRESETS[i];
+    state.ins = ins.split(' '); state.outs = outs.split(' ');
+    const n = state.ins.length, N = 1 << n;
+    state.cols = state.outs.map(() => new Uint8Array(N));
+    for (let x = 0; x < N; x++) f(...bitsOf(x, n)).forEach((v, j) => { state.cols[j][x] = v ? 1 : 0; });
+    $('ins').value = ins; $('outs').value = outs;
+    refreshTable(); schedule();
+  }
+  sel.addEventListener('change', () => { if (sel.value !== 'custom') loadPreset(+sel.value); });
+  const markCustom = () => { sel.value = 'custom'; };
+
+  // ---------- names ----------
+  function parseNames(v) { return v.split(/[\s,]+/).filter(Boolean); }
+  let nameTimer = null;
+  function onNames() {
+    clearTimeout(nameTimer);
+    nameTimer = setTimeout(() => {
+      const ins = parseNames($('ins').value), outs = parseNames($('outs').value), err = $('name-err');
+      const all = ins.concat(outs);
+      let msg = '';
+      if (ins.length < 1 || ins.length > 8) msg = 'Use between 1 and 8 inputs.';
+      else if (outs.length < 1 || outs.length > 8) msg = 'Use between 1 and 8 outputs.';
+      else if (new Set(all).size !== all.length) msg = 'Each input and output needs a different name.';
+      err.hidden = !msg; err.textContent = msg;
+      if (msg) return;
+      const N = 1 << ins.length, sameN = ins.length === state.ins.length;
+      state.cols = outs.map((_, j) => sameN && state.cols[j] ? state.cols[j] : new Uint8Array(N));
+      state.ins = ins; state.outs = outs; markCustom();
+      refreshTable(); schedule();
+    }, 350);
+  }
+  $('ins').addEventListener('input', onNames);
+  $('outs').addEventListener('input', onNames);
+
+  // ---------- truth table ----------
+  function refreshTable() {
+    const n = state.ins.length, N = 1 << n, esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    let h = '<thead><tr><th>Row</th>' + state.ins.map(s => `<th>${esc(s)}</th>`).join('') +
+      state.outs.map((s, j) => `<th class="${j ? '' : 'sep'}">${esc(s)}</th>`).join('') + '</tr></thead><tbody>';
+    for (let x = 0; x < N; x++) {
+      h += `<tr><td class="idx">${x}</td>` + bitsOf(x, n).map(b => `<td class="in">${b}</td>`).join('') +
+        state.cols.map((c, j) => `<td class="${j ? '' : 'sep'}"><button type="button" class="bit" data-j="${j}" data-x="${x}" aria-pressed="${c[x] ? 'true' : 'false'}" aria-label="${esc(state.outs[j])} on row ${x}">${c[x]}</button></td>`).join('') + '</tr>';
+    }
+    $('tt').innerHTML = h + '</tbody>';
+    syncCols();
+  }
+  $('tt').addEventListener('click', e => {
+    const b = e.target.closest('.bit'); if (!b) return;
+    const j = +b.dataset.j, x = +b.dataset.x, v = state.cols[j][x] ^ 1;
+    state.cols[j][x] = v; b.textContent = v; b.setAttribute('aria-pressed', v ? 'true' : 'false');
+    markCustom(); syncCols(); schedule();
+  });
+  function syncCols() { $('cols').value = state.outs.map((s, j) => `${s}: ${Array.from(state.cols[j]).join('')}`).join('\n'); $('cols-err').hidden = true; }
+  $('apply').addEventListener('click', () => {
+    const N = 1 << state.ins.length, err = $('cols-err');
+    const lines = $('cols').value.split('\n').map(l => l.trim()).filter(Boolean);
+    const names = [], cols = [];
+    for (const [k, l] of lines.entries()) {
+      const m = l.match(/^(?:([^:]+):)?\s*([01\s_]+)$/);
+      const bits = m ? m[2].replace(/[\s_]/g, '') : '';
+      if (!m || bits.length !== N) { err.hidden = false; err.textContent = `Line ${k + 1} needs exactly ${N} bits (0 or 1), one per row.`; return; }
+      names.push(m[1] ? m[1].trim().replace(/\s+/g, '_') : `f${k + 1}`); cols.push(Uint8Array.from(bits, c => +c));
+    }
+    if (!cols.length || cols.length > 8) { err.hidden = false; err.textContent = 'Give between 1 and 8 output lines.'; return; }
+    if (new Set(state.ins.concat(names)).size !== state.ins.length + names.length) { err.hidden = false; err.textContent = 'Each output needs a name different from the inputs and the other outputs.'; return; }
+    state.outs = names; state.cols = cols; $('outs').value = names.join(' '); markCustom();
+    refreshTable(); schedule();
+  });
+
+  // ---------- synthesis worker ----------
+  const workerSrc = $('synth').textContent + `
+onmessage = e => {
+  const { id, n, outs } = e.data, O = outs.map(a => new Set(a));
+  const cands = Synth.candidates(O, n), pick = Synth.improve(O, n, cands);
+  const res = cands.map(c => { const g = Synth.cancelXX(c[1]);
+    return { name: c[0], gates: g, nanc: c[2], q: g.reduce((a, x) => a + Synth.qcost(x), 0), ok: Synth.verify(g, n, O, c[2]) }; });
+  postMessage({ id, res, pick: cands.indexOf(pick) });
+};`;
+  let workerURL = null, worker = null, jobId = 0, timer = null;
+  try { workerURL = URL.createObjectURL(new Blob([workerSrc], { type: 'text/javascript' })); } catch (e) { workerURL = null; }
+  function schedule() { clearTimeout(timer); setStatus('busy', 'Synthesizing…'); timer = setTimeout(run, 120); }
+  function run() {
+    const n = state.ins.length, id = ++jobId;
+    const outs = state.cols.map(c => { const a = []; c.forEach((v, x) => { if (v) a.push(x); }); return a; });
+    const job = { id, n, outs }, snapshot = { ins: state.ins.slice(), outs: state.outs.slice(), n };
+    const done = d => { if (d.id === jobId) { state.result = Object.assign(d, snapshot); render(); } };
+    if (worker) { worker.terminate(); worker = null; }
+    if (workerURL) {
+      try {
+        worker = new Worker(workerURL);
+        worker.onmessage = e => { done(e.data); worker && worker.terminate(); worker = null; };
+        worker.onerror = () => { worker = null; workerURL = null; runInline(job, done); };
+        worker.postMessage(job); return;
+      } catch (e) { workerURL = null; }
+    }
+    runInline(job, done);
+  }
+  function runInline(job, done) {
+    setTimeout(() => {
+      const O = job.outs.map(a => new Set(a));
+      const cands = Synth.candidates(O, job.n), pick = Synth.improve(O, job.n, cands);
+      done({ id: job.id, pick: cands.indexOf(pick), res: cands.map(c => { const g = Synth.cancelXX(c[1]);
+        return { name: c[0], gates: g, nanc: c[2], q: g.reduce((a, x) => a + Synth.qcost(x), 0), ok: Synth.verify(g, job.n, O, c[2]) }; }) });
+    }, 0);
+  }
+  function setStatus(kind, text) { const s = $('status'); s.className = 'chip ' + kind; s.textContent = text; }
+
+  // ---------- mode ----------
+  function setMode(m) { state.mode = m; $('m-hyb').setAttribute('aria-pressed', m === 'hyb'); $('m-dis').setAttribute('aria-pressed', m === 'dis'); if (state.result) render(); }
+  $('m-hyb').addEventListener('click', () => setMode('hyb'));
+  $('m-dis').addEventListener('click', () => setMode('dis'));
+
+  // ---------- render ----------
+  function render() {
+    const R = state.result, i = state.mode === 'hyb' ? R.pick : 0, c = R.res[i], n = R.n, m = R.outs.length;
+    const width = n + m + c.nanc, rows = 1 << n;
+    setStatus(c.ok ? 'ok' : 'no', c.ok ? `✓ Correct on all ${rows} input rows` : '✗ Check failed');
+    const [label, kind] = LABELS[c.name];
+    $('mode-note').textContent = state.mode === 'hyb'
+      ? (i === 0 ? 'Hybrid kept the disjoint circuit: no candidate beat it.' : `Hybrid picked: ${label}.`)
+      : 'Disjoint groups only: correct by Theorems 1 and 2 of the paper.';
+    const cnot = c.gates.filter(g => g[0] === 'MCX' && g[1].length === 1).length;
+    const tof = c.gates.filter(g => g[0] === 'MCX' && g[1].length >= 2).length;
+    const xs = c.gates.length - cnot - tof;
+    $('stats').innerHTML = [[c.gates.length, 'gates'], [c.q, 'quantum cost'], [width, 'qubits'], [`${xs} · ${cnot} · ${tof}`, 'X · CNOT · Toffoli']]
+      .map(([v, k]) => `<div class="stat"><b>${v}</b><span>${k}</span></div>`).join('');
+    const labels = R.ins.concat(R.outs, Array.from({ length: c.nanc }, (_, k) => `anc${k}`));
+    $('circ').innerHTML = c.gates.length ? drawCircuit(c.gates, labels, n) : '<p class="hint">No gates needed: every output is 0 on every row.</p>';
+    $('cands').innerHTML = '<thead><tr><th>Candidate</th><th>Cover</th><th class="num">Gates</th><th class="num">Cost</th><th class="num">Checked</th></tr></thead><tbody>' +
+      R.res.map((r, k) => `<tr class="${k === i ? 'pick' : ''}"><td>${LABELS[r.name][0]}</td><td class="tag">${LABELS[r.name][1]}</td><td class="num">${r.gates.length}</td><td class="num">${r.q}</td><td class="num">${r.ok ? '✓' : '✗'}</td></tr>`).join('') + '</tbody>';
+    $('qiskit').textContent = qiskit(c.gates, labels, n, m);
+  }
+
+  function columns(gates) {
+    const last = new Map();
+    return gates.map(g => {
+      const ws = g[0] === 'X' ? [g[1]] : g[1].concat([g[2]]), lo = Math.min(...ws), hi = Math.max(...ws);
+      let c = -1; for (let w = lo; w <= hi; w++) c = Math.max(c, last.has(w) ? last.get(w) : -1);
+      c++; for (let w = lo; w <= hi; w++) last.set(w, c);
+      return c;
+    });
+  }
+  function drawCircuit(gates, labels, n) {
+    const cols = columns(gates), W = Math.max(...cols) + 1, cw = 36, rh = 40;
+    const text = labels.map((lab, w) => lab + (w >= n && !lab.startsWith('anc') ? ' = |0⟩' : ''));
+    const lw = Math.max(...text.map(s => s.length)) * 8.6 + 14, top = 22;
+    const X = c => lw + 18 + c * cw, Y = w => top + w * rh, width = X(W - 1) + 36, height = Y(labels.length - 1) + 24;
+    const esc = s => s.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+    let s = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="Circuit diagram with ${gates.length} gates">`;
+    labels.forEach((lab, w) => {
+      s += `<text x="${lw}" y="${Y(w) + 5}" text-anchor="end" class="wl">${esc(text[w])}</text>`;
+      s += `<line x1="${lw + 8}" y1="${Y(w)}" x2="${width - 8}" y2="${Y(w)}" class="w"/>`;
+    });
+    gates.forEach((g, k) => {
+      const x = X(cols[k]);
+      if (g[0] === 'X' || !g[1].length) {
+        const y = Y(g[0] === 'X' ? g[1] : g[2]);
+        s += `<rect x="${x - 11}" y="${y - 11}" width="22" height="22" rx="3" class="xg"/><text x="${x}" y="${y + 5}" text-anchor="middle" class="xt">X</text>`;
+        return;
+      }
+      const ws = g[1].concat([g[2]]);
+      s += `<line x1="${x}" y1="${Y(Math.min(...ws))}" x2="${x}" y2="${Y(Math.max(...ws))}" class="w"/>`;
+      g[1].forEach(w => { s += `<circle cx="${x}" cy="${Y(w)}" r="5" class="cd"/>`; });
+      const y = Y(g[2]);
+      s += `<circle cx="${x}" cy="${y}" r="10" class="tg"/><line x1="${x - 10}" y1="${y}" x2="${x + 10}" y2="${y}" class="w"/><line x1="${x}" y1="${y - 10}" x2="${x}" y2="${y + 10}" class="w"/>`;
+    });
+    return s + '</svg>';
+  }
+  function qiskit(gates, labels, n, m) {
+    const L = [];
+    L.push('from qiskit import QuantumCircuit', '');
+    L.push('# ' + labels.map((s, i) => `${i}: ${s}`).join(', '));
+    L.push(`# inputs 0-${n - 1}; outputs ${n}-${n + m - 1} start at |0>` + (labels.length > n + m ? '; ancillas start and end at |0>' : ''));
+    L.push(`qc = QuantumCircuit(${labels.length})`);
+    for (const g of gates) {
+      if (g[0] === 'X') L.push(`qc.x(${g[1]})`);
+      else if (!g[1].length) L.push(`qc.x(${g[2]})`);
+      else if (g[1].length === 1) L.push(`qc.cx(${g[1][0]}, ${g[2]})`);
+      else if (g[1].length === 2) L.push(`qc.ccx(${g[1][0]}, ${g[1][1]}, ${g[2]})`);
+      else L.push(`qc.mcx([${g[1].join(', ')}], ${g[2]})`);
+    }
+    return L.join('\n');
+  }
+  $('copy').addEventListener('click', () => {
+    const t = $('qiskit').textContent, btn = $('copy');
+    const selectIt = () => { const r = document.createRange(); r.selectNodeContents($('qiskit')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); btn.textContent = 'Selected: press Ctrl/Cmd+C'; };
+    try { navigator.clipboard.writeText(t).then(() => { btn.textContent = 'Copied'; setTimeout(() => { btn.textContent = 'Copy code'; }, 1500); }, selectIt); } catch (e) { selectIt(); }
+  });
+
+  loadPreset(0);
+})();
+</script>
+</body>
+</html>

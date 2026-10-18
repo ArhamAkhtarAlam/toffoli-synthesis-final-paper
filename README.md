@@ -21,6 +21,8 @@ The hybrid (overlapping covers, selection by CZ count):
 - `code/improve.py` - the hybrid's candidates: other disjoint covers (other seeds and variable orders) and overlapping XOR (ESOP) covers from every fixed-polarity Reed-Muller form, each run through the same pipeline and checked on all inputs; the disjoint pipeline's circuit is kept unless a candidate has no more gates and no higher quantum cost. Output in `code/results/improve.txt`
 - `code/improve_device.py` - transpiles those candidates like `device.py` and keeps the one with the fewest CZ gates (the disjoint pipeline's circuit is a candidate, so never worse on the device); the Hyb. columns of Table I. Output in `code/results/device_torino_improved.txt`
 
+**Try it in the browser:** https://arhamakhtaralam.github.io/toffoli-synthesis-final-paper/ (`docs/index.html`, served by GitHub Pages). Type a truth table and get the disjoint and hybrid circuits, each checked on every input row, with Qiskit code. It is a JavaScript port of `improve.py` and the modules it uses, and gives the same circuit, gate for gate, on the eleven benchmarks and on `randcheck.py`'s 2000 random truth tables. The last step of the paper's hybrid, choosing by CZ count after transpiling, needs Qiskit, so the page chooses by gates and quantum cost instead (`improve.improve`).
+
 Run `cd code && python3 recompute.py && python3 randcheck.py`.
 
 `table.py`, `draw.py`, `randcheck.py` and `device.py` run in parallel worker processes, one per CPU core by default; pass a number to use fewer (e.g. `python3 randcheck.py 4`). Results do not depend on the number of workers. `draw.py` needs matplotlib.
