@@ -1,0 +1,36 @@
+backend fake_torino, 133 qubits, basis ['cz', 'delay', 'for_loop', 'id', 'if_else', 'measure', 'reset', 'rz', 'switch_case', 'sx', 'x'], optimization_level=3, seed_transpiler=0, qubits_initially_zero=False
+function       method    gates     Q     2q  depth  check
+AND            this work     1     5      7     30  4 inputs (all) on 3 active qubits
+AND            pkrm          1     5      7     30  4 inputs (all) on 3 active qubits
+AND            pprm          1     5      7     30  4 inputs (all) on 3 active qubits
+OR             this work     4     8      7     29  4 inputs (all) on 3 active qubits
+OR             pkrm          4     8     10     36  4 inputs (all) on 3 active qubits
+OR             pprm          3     7      8     33  4 inputs (all) on 3 active qubits
+XOR            this work     6    14     17     63  4 inputs (all) on 3 active qubits
+XOR            pkrm          2     2      2      7  4 inputs (all) on 3 active qubits
+XOR            pprm          2     2      2      7  4 inputs (all) on 3 active qubits
+NAND           this work     6    10      7     30  4 inputs (all) on 3 active qubits
+NAND           pkrm          6    10      8     31  4 inputs (all) on 3 active qubits
+NAND           pprm          2     6      7     31  4 inputs (all) on 3 active qubits
+Half adder     this work     6    14     19     64  4 inputs (all) on 4 active qubits
+Half adder     pkrm          3     7     14     45  4 inputs (all) on 4 active qubits
+Half adder     pprm          3     7     14     45  4 inputs (all) on 4 active qubits
+Full adder     this work    14    74    133    424  8 inputs (all) on 5 active qubits
+Full adder     pkrm         10    22     34     94  8 inputs (all) on 5 active qubits
+Full adder     pprm          6    18     36     99  8 inputs (all) on 5 active qubits
+2b ripple      this work    31   411    514   1409  32 inputs (all) on 9 active qubits
+2b ripple      pkrm         34   142    243    748  32 inputs (all) on 9 active qubits
+2b ripple      pprm         18   118    231    701  32 inputs (all) on 9 active qubits
+BCD-XS3        this work    22   190    279    760  16 inputs (all) on 8 active qubits
+BCD-XS3        pkrm         45   257    388   1104  16 inputs (all) on 8 active qubits
+BCD-XS3        pprm         32   292    493   1442  16 inputs (all) on 8 active qubits
+3x3 mult       this work    60  1920   2058   5210  64 inputs (all) on 12 active qubits
+3x3 mult       pkrm         80   936   1235   3313  64 inputs (all) on 15 active qubits
+3x3 mult       pprm         27   919   1039   2849  64 inputs (all) on 12 active qubits
+4b comparator  this work    52  8180   7534  14263  256 inputs (all) on 9 active qubits
+4b comparator  pkrm         24   472    752   1848  256 inputs (all) on 9 active qubits
+4b comparator  pprm         81  1009   1768   4988  256 inputs (all) on 9 active qubits
+3_17           this work    13    37     65    197  8 inputs (all) on 6 active qubits
+3_17           pkrm         15    31     44    126  8 inputs (all) on 6 active qubits
+3_17           pprm         14    30     49    135  8 inputs (all) on 6 active qubits
+this work vs each tweedledum circuit, 22 pairs: which needs fewer 2q gates on the device matches which has lower Q-cost in 18, fewer MCT gates in 13
