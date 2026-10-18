@@ -90,8 +90,37 @@ footer { border-top: 1.5px solid var(--rule); padding-top: 16px; font-size: 14px
 .circ .cd { fill: var(--wire); }
 .circ .tg { fill: var(--gate-fill); stroke: var(--wire); stroke-width: 1.6; }
 .circ .xg { fill: var(--gate-fill); stroke: var(--x); stroke-width: 1.8; }
+.circ .xg.hl { stroke: var(--bad); stroke-width: 2.4; stroke-dasharray: 4 3; fill: var(--bad-soft); }
 .circ .xt { fill: var(--x); font: 600 13px var(--f-mono); }
 code { font-family: var(--f-mono); font-size: .95em; }
+.steplist { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.steplist button { font: 500 13px var(--f-body); display: inline-flex; gap: 8px; align-items: center; padding: 6px 12px 6px 6px; border-radius: 999px; border: 1.5px solid var(--rule); background: var(--surface); color: var(--ink); cursor: pointer; }
+.steplist button span { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 600; font-size: 12px; }
+.steplist button[aria-current="step"] { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+.steplist button[aria-current="step"] span { background: var(--accent-ink); color: var(--accent); }
+.sbody { display: flex; flex-direction: column; gap: 14px; max-width: 100%; min-width: 0; }
+.sbody p { margin: 0; max-width: 72ch; }
+.stepnav { display: flex; justify-content: space-between; align-items: center; gap: 12px; border-top: 1.5px solid var(--rule); padding-top: 14px; }
+.btn:disabled { opacity: .4; cursor: default; }
+ul.plain { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+ul.terms { list-style: none; padding: 0; font-family: var(--f-mono); }
+.ov { text-decoration: overline; }
+.dot { color: var(--muted); padding: 0 1px; }
+.kmgrid { display: flex; flex-wrap: wrap; gap: 24px 36px; }
+.kmout { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.km { font-family: var(--f-mono); font-size: 14px; }
+.km th { font-size: 12px; color: var(--muted); font-weight: 500; padding: 2px 6px; }
+.km th.corner span { padding: 0 2px; }
+.km td { width: 56px; height: 56px; border: 1.5px solid var(--ink); text-align: center; position: relative; background: var(--surface); }
+.km td.on { background: var(--accent-soft); }
+.km td .v { font-size: 16px; font-weight: 500; }
+.km td .tl, .terms .tl { display: inline-grid; place-items: center; min-width: 18px; height: 18px; border-radius: 9px; background: var(--accent); color: var(--accent-ink); font: 600 11px var(--f-body); padding: 0 3px; }
+.km td .tl { position: absolute; right: 3px; top: 3px; min-width: 16px; height: 16px; font-size: 10px; }
+.terms li { display: flex; gap: 8px; align-items: flex-start; }
+.terms .tx { min-width: 0; overflow-wrap: anywhere; }
+.kmout { max-width: 100%; }
+.sbody .chip { align-self: flex-start; }
+[hidden] { display: none !important; }
 </style>
 
 </head>
@@ -132,9 +161,11 @@ code { font-family: var(--f-mono); font-size: .95em; }
       <div class="seg" role="group" aria-label="Method">
         <button type="button" id="m-hyb" aria-pressed="true">Hybrid</button>
         <button type="button" id="m-dis" aria-pressed="false">Disjoint only</button>
+        <button type="button" id="m-step" aria-pressed="false">Step by step</button>
       </div>
       <span class="chip busy" id="status">Synthesizing…</span>
     </div>
+    <div id="results" class="pane">
     <p class="hint" id="mode-note"></p>
     <div class="stats" id="stats"></div>
     <div class="card">
@@ -149,6 +180,15 @@ code { font-family: var(--f-mono); font-size: .95em; }
     <div class="card">
       <div class="cardhead"><h2>Qiskit</h2><button class="btn ghost" id="copy" type="button">Copy code</button></div>
       <pre id="qiskit"></pre>
+    </div>
+    </div>
+    <div id="steps" class="pane" hidden>
+      <ol class="steplist" id="s-list" aria-label="Steps"></ol>
+      <div class="card">
+        <h2 id="s-title"></h2>
+        <div class="sbody" id="s-body"></div>
+        <div class="stepnav"><button class="btn ghost" id="s-prev" type="button">← Back</button><span class="tag" id="s-pos"></span><button class="btn" id="s-next" type="button">Next →</button></div>
+      </div>
     </div>
   </section>
 </div>
@@ -596,7 +636,7 @@ onmessage = e => {
   function run() {
     const n = state.ins.length, id = ++jobId;
     const outs = state.cols.map(c => { const a = []; c.forEach((v, x) => { if (v) a.push(x); }); return a; });
-    const job = { id, n, outs }, snapshot = { ins: state.ins.slice(), outs: state.outs.slice(), n };
+    const job = { id, n, outs }, snapshot = { ins: state.ins.slice(), outs: state.outs.slice(), n, sets: outs };
     const done = d => { if (d.id === jobId) { state.result = Object.assign(d, snapshot); render(); } };
     if (worker) { worker.terminate(); worker = null; }
     if (workerURL) {
@@ -620,15 +660,22 @@ onmessage = e => {
   function setStatus(kind, text) { const s = $('status'); s.className = 'chip ' + kind; s.textContent = text; }
 
   // ---------- mode ----------
-  function setMode(m) { state.mode = m; $('m-hyb').setAttribute('aria-pressed', m === 'hyb'); $('m-dis').setAttribute('aria-pressed', m === 'dis'); if (state.result) render(); }
+  function setMode(m) {
+    state.mode = m;
+    for (const [id, k] of [['m-hyb', 'hyb'], ['m-dis', 'dis'], ['m-step', 'step']]) $(id).setAttribute('aria-pressed', m === k);
+    $('results').hidden = m === 'step'; $('steps').hidden = m !== 'step';
+    if (state.result) render(); else if (m === 'step') TTSteps.render(null);
+  }
   $('m-hyb').addEventListener('click', () => setMode('hyb'));
   $('m-dis').addEventListener('click', () => setMode('dis'));
+  $('m-step').addEventListener('click', () => setMode('step'));
 
   // ---------- render ----------
   function render() {
-    const R = state.result, i = state.mode === 'hyb' ? R.pick : 0, c = R.res[i], n = R.n, m = R.outs.length;
+    const R = state.result, i = state.mode === 'dis' ? 0 : R.pick, c = R.res[i], n = R.n, m = R.outs.length;
     const width = n + m + c.nanc, rows = 1 << n;
     setStatus(c.ok ? 'ok' : 'no', c.ok ? `✓ Correct on all ${rows} input rows` : '✗ Check failed');
+    if (state.mode === 'step') { TTSteps.render(R); return; }
     const [label, kind] = LABELS[c.name];
     $('mode-note').textContent = state.mode === 'hyb'
       ? (i === 0 ? 'Hybrid kept the disjoint circuit: no candidate beat it.' : `Hybrid picked: ${label}.`)
@@ -654,7 +701,7 @@ onmessage = e => {
       return c;
     });
   }
-  function drawCircuit(gates, labels, n) {
+  function drawCircuit(gates, labels, n, hl) {
     const cols = columns(gates), W = Math.max(...cols) + 1, cw = 36, rh = 40;
     const text = labels.map((lab, w) => lab + (w >= n && !lab.startsWith('anc') ? ' = |0⟩' : ''));
     const lw = Math.max(...text.map(s => s.length)) * 8.6 + 14, top = 22;
@@ -669,7 +716,7 @@ onmessage = e => {
       const x = X(cols[k]);
       if (g[0] === 'X' || !g[1].length) {
         const y = Y(g[0] === 'X' ? g[1] : g[2]);
-        s += `<rect x="${x - 11}" y="${y - 11}" width="22" height="22" rx="3" class="xg"/><text x="${x}" y="${y + 5}" text-anchor="middle" class="xt">X</text>`;
+        s += `<rect x="${x - 11}" y="${y - 11}" width="22" height="22" rx="3" class="xg${hl && hl.has(k) ? ' hl' : ''}"/><text x="${x}" y="${y + 5}" text-anchor="middle" class="xt">X</text>`;
         return;
       }
       const ws = g[1].concat([g[2]]);
@@ -701,7 +748,132 @@ onmessage = e => {
     try { navigator.clipboard.writeText(t).then(() => { btn.textContent = 'Copied'; setTimeout(() => { btn.textContent = 'Copy code'; }, 1500); }, selectIt); } catch (e) { selectIt(); }
   });
 
+  window.TT = { drawCircuit, LABELS };
   loadPreset(0);
+})();
+</script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const bitsOf = (x, n) => Array.from({ length: n }, (_, i) => x >> (n - 1 - i) & 1);
+  const letter = k => k < 26 ? String.fromCharCode(97 + k) : 't' + (k + 1);
+  let cur = 0, data = null;
+
+  function term(p, names) {
+    const lits = p.map((v, i) => v === -1 ? '' : v === 1 ? esc(names[i]) : `<span class="ov">${esc(names[i])}</span>`).filter(Boolean);
+    return lits.length ? lits.join('<span class="dot">·</span>') : '1';
+  }
+  // the X-cancellation pass of gatelevel.py, also reporting which gates were removed together
+  function cancelTrack(gates) {
+    let a = gates.map((g, i) => ({ g, i })); const pairs = [];
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (let i = 0; i < a.length && !changed; i++) {
+        if (a[i].g[0] !== 'X') continue;
+        const w = a[i].g[1];
+        for (let j = i + 1; j < a.length; j++) {
+          const h = a[j].g;
+          if (h[0] === 'X' && h[1] === w) { pairs.push([a[i].i, a[j].i]); a.splice(j, 1); a.splice(i, 1); changed = true; break; }
+          if (h[0] !== 'X' && h[1].includes(w)) break;
+        }
+      }
+    }
+    return pairs;
+  }
+  function simulate(gates, x, n, width) {
+    const s = bitsOf(x, n).concat(new Array(width - n).fill(0));
+    for (const g of gates) { if (g[0] === 'X') s[g[1]] ^= 1; else if (g[1].every(c => s[c])) s[g[2]] ^= 1; }
+    return s;
+  }
+  function kmap(S, names, n, cover) {
+    const rb = n >> 1, cb = n - rb, gray = b => Array.from({ length: 1 << b }, (_, i) => i ^ (i >> 1));
+    const R = gray(rb), C = gray(cb), who = new Map();
+    cover.forEach((p, k) => { for (let x = 0; x < 1 << n; x++) if (p.every((v, i) => v === -1 || v === (x >> (n - 1 - i) & 1))) who.set(x, (who.get(x) || []).concat(letter(k))); });
+    const lab = (v, b) => v.toString(2).padStart(b, '0');
+    let h = `<table class="km"><thead><tr><th class="corner">${esc(names.slice(0, rb).join('')) || ''}<span>\\</span>${esc(names.slice(rb).join(''))}</th>` + C.map(c => `<th>${lab(c, cb)}</th>`).join('') + '</tr></thead><tbody>';
+    for (const r of R) {
+      h += `<tr><th>${rb ? lab(r, rb) : ''}</th>`;
+      for (const c of C) {
+        const x = (r << cb) | c, on = S.has(x), t = who.get(x);
+        h += `<td class="${on ? 'on' : ''}"><span class="v">${on ? 1 : 0}</span>${t ? `<span class="tl">${t.join('')}</span>` : ''}</td>`;
+      }
+      h += '</tr>';
+    }
+    return h + '</tbody></table>';
+  }
+
+  function compute(R) {
+    const n = R.n, m = R.outs.length, O = R.sets.map(a => new Set(a));
+    const covers = O.map(S => Synth.disjointCover(S, n));
+    const [eb, en] = Synth.synthesize(O, n, { share: false, derive: false });
+    const emitted = eb.flat(), pairs = cancelTrack(emitted), afterX = Synth.cancelXX(emitted);
+    const [db, dn] = Synth.synthesize(O, n);
+    const derived = Synth.cancelXX(db.flat());
+    const bases = db.filter(b => b.length === 1 && b[0][0] === 'MCX' && b[0][1].length === 1 && b[0][1][0] >= n && b[0][1][0] < n + m).map(b => [b[0][1][0] - n, b[0][2] - n]);
+    return { n, m, O, covers, emitted, en, pairs, afterX, derived, dn, bases, ord: R.res[0], hyb: R.res[R.pick], R };
+  }
+  const names = (d, nanc) => d.R.ins.concat(d.R.outs, Array.from({ length: nanc }, (_, k) => `anc${k}`));
+  const count = (g, nanc) => `<div class="stats"><div class="stat"><b>${g.length}</b><span>gates</span></div><div class="stat"><b>${g.reduce((a, x) => a + Synth.qcost(x), 0)}</b><span>quantum cost</span></div></div>`;
+  const circ = (d, g, nanc, hl) => g.length ? `<div class="circ">${TT.drawCircuit(g, names(d, nanc), d.n, hl)}</div>` : '<p class="hint">No gates: every output is 0 on every row.</p>';
+
+  const STEPS = [
+    ['Read the truth table', d => {
+      const rows = d.R.outs.map((o, j) => { const on = [...d.O[j]].sort((a, b) => a - b);
+        return `<li><strong>${esc(o)}</strong> is 1 on ${on.length ? `${on.length} of ${1 << d.n} rows: ${on.slice(0, 24).join(', ')}${on.length > 24 ? ', …' : ''}` : 'no row'}.</li>`; }).join('');
+      return `<p>${d.n} input${d.n > 1 ? 's' : ''} (${esc(d.R.ins.join(', '))}) and ${d.m} output${d.m > 1 ? 's' : ''}, so ${1 << d.n} rows. The circuit will keep the inputs, start every output wire at 0, and must flip each output on exactly the rows where it is 1.</p><ul class="plain">${rows}</ul>
+      <p class="hint">A Toffoli gate flips its target. A cell flipped twice is back to 0, which is why the usual K-map habit of overlapping groups breaks here.</p>`; }],
+    ['Group the 1-cells, without overlaps', d => {
+      const parts = d.R.outs.map((o, j) => {
+        const cov = d.covers[j];
+        const list = cov.length ? cov.map((p, k) => `<li><span class="tl">${letter(k)}</span><span class="tx">${term(p, d.R.ins)}</span></li>`).join('') : '<li>no 1-cells, no groups</li>';
+        return `<div class="kmout"><div class="label">${esc(o)}</div>${d.n <= 4 ? kmap(d.O[j], d.R.ins, d.n, cov) : ''}<ul class="plain terms">${list}</ul></div>`;
+      }).join('');
+      return `<p>Algorithm 1 takes the smallest uncovered 1-cell and grows a group from it, one input at a time, but only into cells that are 1 and not yet covered. So every 1-cell ends up in exactly one group (Theorem 1). Each letter marks the group that covers a cell.</p>${d.n > 4 ? '<p class="hint">K-maps are drawn for up to 4 inputs; the groups are listed below.</p>' : ''}<div class="kmgrid">${parts}</div>`; }],
+    ['One Toffoli per group', d => {
+      const t = d.covers.reduce((a, c) => a + c.length, 0);
+      return `<p>Each group becomes one gate on its output wire, controlled by the inputs the group fixes. An input that must be 0 is wrapped in X gates, so the control fires on 0. ${t} group${t === 1 ? '' : 's'} give this circuit. Outputs are written cheapest first.</p>${count(d.emitted, d.en)}${circ(d, d.emitted, d.en)}
+      <p class="hint">Correct already: each output flips once on each of its 1-cells (Theorem 2).</p>`; }],
+    ['Cancel X pairs', d => {
+      const hl = new Set(d.pairs.flat());
+      return `<p>When one group ends with an X on a wire and a later one starts with an X on the same wire, and nothing in between uses that wire as a control, the two X gates cancel (X·X = I, Lemma 3). ${d.pairs.length ? `Here ${d.pairs.length} pair${d.pairs.length > 1 ? 's' : ''} cancel (dashed), removing ${2 * d.pairs.length} gates.` : 'Here no pair cancels.'}</p>
+      ${circ(d, d.emitted, d.en, hl)}<p class="label">After cancelling</p>${count(d.afterX, d.en)}${circ(d, d.afterX, d.en)}`; }],
+    ['Derive outputs from each other', d => {
+      const txt = d.bases.length ? d.bases.map(([b, t]) => `<li><strong>${esc(d.R.outs[t])}</strong> starts as a copy of ${esc(d.R.outs[b])} (one CNOT), then only the cells where they differ are fixed.</li>`).join('')
+        : '<li>No output got cheaper this way, so each keeps its own groups.</li>';
+      return `<p>Sometimes an output is cheaper as a copy of another output plus a correction (Lemma 2). Each option is scored by its gate count after X-cancellation, and the plain circuit is kept if nothing helps.</p><ul class="plain">${txt}</ul>${count(d.derived, d.dn)}${circ(d, d.derived, d.dn)}`; }],
+    ['Reorder the groups', d => `<p>Groups on different outputs, or on the same output, can be done in any order (Lemma 4), so the order is changed to let more X pairs meet and cancel. This is the final <strong>disjoint</strong> circuit, the one the paper proves correct.</p>${count(d.ord.gates, d.ord.nanc)}${circ(d, d.ord.gates, d.ord.nanc)}`],
+    ['Try overlapping covers (hybrid)', d => {
+      const same = d.R.pick === 0, L = TT.LABELS[d.hyb.name][0];
+      return `<p>Overlapping groups are fine when every cell is covered an odd number of times where the output is 1 and an even number elsewhere (Theorem 2). Reed–Muller forms give such covers. Each one goes through the same steps, is checked on every row, and replaces the disjoint circuit only if it is no worse in gates and quantum cost.</p>
+      <p>${same ? 'No overlapping cover beat the disjoint circuit here, so it is kept.' : `Best: <strong>${esc(L)}</strong>, ${d.ord.gates.length} → ${d.hyb.gates.length} gates.`}</p>${count(d.hyb.gates, d.hyb.nanc)}${circ(d, d.hyb.gates, d.hyb.nanc)}`; }],
+    ['Check every row', d => {
+      const g = d.hyb.gates, width = d.n + d.m + d.hyb.nanc, N = 1 << d.n, show = Math.min(N, 32);
+      let ok = 0, rows = '';
+      for (let x = 0; x < N; x++) {
+        const s = simulate(g, x, d.n, width), want = d.O.map(S => S.has(x) ? 1 : 0), got = want.map((_, j) => s[d.n + j]);
+        const good = got.every((v, j) => v === want[j]) && s.slice(0, d.n).every((v, i) => v === bitsOf(x, d.n)[i]) && s.slice(d.n + d.m).every(v => !v);
+        ok += good;
+        if (x < show) rows += `<tr><td class="in">${bitsOf(x, d.n).join('')}</td><td>${want.join('')}</td><td>${got.join('')}</td><td>${good ? '✓' : '✗'}</td></tr>`;
+      }
+      return `<p>The circuit is run on every input row, starting with the outputs at 0, and each result is compared with the table. Every gate maps a row of bits to a row of bits, so this check is exact.</p>
+      <p class="chip ${ok === N ? 'ok' : 'no'}">${ok === N ? '✓' : '✗'} ${ok} of ${N} rows correct</p>
+      <div class="tt-wrap" style="max-height: 340px"><table class="tt"><thead><tr><th>${esc(d.R.ins.join(' '))}</th><th>wanted ${esc(d.R.outs.join(' '))}</th><th>circuit</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+      ${N > show ? `<p class="hint">First ${show} rows shown; all ${N} were checked.</p>` : ''}`; }],
+  ];
+
+  function draw() {
+    $('s-list').innerHTML = STEPS.map(([t], k) => `<li><button type="button" data-k="${k}" aria-current="${k === cur ? 'step' : 'false'}"><span>${k + 1}</span>${esc(t)}</button></li>`).join('');
+    $('s-title').textContent = `${cur + 1}. ${STEPS[cur][0]}`;
+    $('s-body').innerHTML = data ? STEPS[cur][1](data) : '<p class="hint">Synthesizing…</p>';
+    $('s-prev').disabled = cur === 0; $('s-next').disabled = cur === STEPS.length - 1;
+    $('s-pos').textContent = `Step ${cur + 1} of ${STEPS.length}`;
+  }
+  $('s-list').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { cur = +b.dataset.k; draw(); } });
+  $('s-prev').addEventListener('click', () => { if (cur > 0) { cur--; draw(); } });
+  $('s-next').addEventListener('click', () => { if (cur < STEPS.length - 1) { cur++; draw(); } });
+  window.TTSteps = { render(R) { data = R ? compute(R) : null; draw(); } };
 })();
 </script>
 </body>
