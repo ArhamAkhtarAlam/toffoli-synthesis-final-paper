@@ -1,8 +1,8 @@
 """Device-level numbers for improve.py's circuits, with the same transpiler settings and
 statevector check as device.py; tweedledum's rows are read from results/device_torino.txt.
 Two picks per function: improve()'s (fewest gates without raising quantum cost), and the
-candidate with the fewest CZ gates after transpiling, which includes the paper's circuit,
-so it is never worse on the device than the paper's.
+candidate with the fewest CZ gates after transpiling, which includes the disjoint pipeline's circuit,
+so it is never worse on the device than the disjoint pipeline's.
 Run: python3 improve_device.py [workers]   (needs qiskit and qiskit-ibm-runtime)"""
 import io, os, re, sys, contextlib
 from concurrent.futures import ProcessPoolExecutor
@@ -28,7 +28,7 @@ def job(name):
     g, nanc = improve(outs, n, info=info)
     res['improve'] = stats(info['used'], g, nanc)
     allc = [stats(c[0], c[1], c[2]) for c in candidates(outs, n)]
-    res['cz'] = min(allc, key=lambda r: (r[2], r[0]))  # paper's circuit is first, so it wins ties
+    res['cz'] = min(allc, key=lambda r: (r[2], r[0]))  # the disjoint pipeline's circuit is first, so it wins ties
     return res
 
 def paper_rows(path='results/device_torino.txt'):
@@ -46,7 +46,7 @@ def main(workers=None):
         res = dict(zip(names, ex.map(job, names)))
     old = paper_rows()
     print("CZ gates on FakeTorino (optimization_level=3, seed 0, qubits_initially_zero=False)")
-    print(f"{'function':14s} {'paper':>6s} {'improve':>8s} {'CZ pick':>8s} {'PKRM':>6s} {'PPRM':>6s}  CZ pick: circuit, check")
+    print(f"{'function':14s} {'disj.':>6s} {'improve':>8s} {'CZ pick':>8s} {'PKRM':>6s} {'PPRM':>6s}  CZ pick: circuit, check")
     for f in names:
         a, b = res[f]['improve'], res[f]['cz']
         assert b[2] <= old[(f, 'this work')][2]

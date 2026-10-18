@@ -1,6 +1,7 @@
-"""Optional improvement layer on top of the paper's pipeline (not used for any number in the paper).
+"""The hybrid of the paper (Section III, "Overlapping covers"; Section IV, "Selection"), built on the
+disjoint pipeline (ordering.ordered), which the paper also reports on its own.
 
-Builds extra candidate circuits and keeps one only if it is no worse than the paper's circuit
+Builds extra candidate circuits and keeps one only if it is no worse than the disjoint pipeline's circuit
 (ordering.ordered) in both gate count and quantum cost after X-cancellation, so the result can
 never be worse than the pipeline's. Every candidate is replayed on all 2^n inputs before it is
 compared. Candidate covers, each fed through the same derivation, sharing, cancellation and
@@ -107,9 +108,9 @@ def score(g):
     return len(g), sum(map(qcost, g))
 
 def candidates(outs, n, kinds=('multistart', 'esop')):
-    """[(name, gates, nanc)]: the paper's circuit first, then one per cover variant,
+    """[(name, gates, nanc)]: the disjoint pipeline's circuit first, then one per cover variant,
     each checked on all inputs."""
-    out = [('paper',) + tuple(ordered(outs, n))]
+    out = [('disjoint',) + tuple(ordered(outs, n))]
     for name, cover in COVERS.items():
         if GROUP[name.split('-')[0]] not in kinds: continue
         g, na = ordered(outs, n, cover=cover)
@@ -118,24 +119,28 @@ def candidates(outs, n, kinds=('multistart', 'esop')):
     return out
 
 def improve(outs, n, kinds=('multistart', 'esop'), info=None):
-    """The paper's circuit, or a verified candidate with no more gates and no higher quantum cost
+    """The disjoint pipeline's circuit, or a verified candidate with no more gates and no higher quantum cost
     (fewest gates, then lowest cost, among those). Returns (gates, nanc), uncancelled like ordered()."""
     cands = candidates(outs, n, kinds)
     p = score(cands[0][1])
     ok = [c for c in cands if score(c[1])[0] <= p[0] and score(c[1])[1] <= p[1]]
-    name, g, na = min(ok, key=lambda c: score(c[1]))  # min keeps the first on ties: the paper's
+    name, g, na = min(ok, key=lambda c: score(c[1]))  # min keeps the first on ties: the disjoint pipeline's
     if info is not None: info['used'] = name
     return g, na
 
 def job(args):
     name, outs, n = args
     p = score(ordered(outs, n)[0])
-    r = {'name': name, 'paper': p}
+    r = {'name': name, 'disjoint': p}
     for kinds in (('multistart',), ('multistart', 'esop')):
         info = {}
         g, na = improve(outs, n, kinds, info)
         assert verify(g, n, outs, na)
         r[kinds[-1]] = (score(g), info['used'])
+    if name is not None:  # ablation: the gate-count ESOP cover with and without derivation
+        c = COVERS['esop-gates']
+        r['esop_noderiv'] = score(ordered(outs, n, cover=c, share=False, derive=False)[0])
+        r['esop_deriv'] = score(ordered(outs, n, cover=c)[0])
     return r
 
 def main(workers=None):
@@ -152,23 +157,28 @@ def main(workers=None):
     with ProcessPoolExecutor(workers, mp_context=get_context('spawn')) as ex:
         res = list(ex.map(job, [(f, o, n) for f, o, n in fs] + rnd, chunksize=8))
     bench, rand = res[:len(fs)], res[len(fs):]
-    print("== Benchmarks: gates / quantum cost after X-cancellation (never worse than the paper's) ==")
-    print(f"{'function':15s} {'paper':>12s} {'+multistart':>12s} {'+ESOP':>12s}  {'PKRM':>10s} {'PPRM':>10s}  ESOP pick")
+    print("== Benchmarks: gates / quantum cost after X-cancellation (never worse than the disjoint pipeline's) ==")
+    print("(ESOP no der. / + der.: the gate-count ESOP cover alone, without and with derivation)")
+    print(f"{'function':15s} {'disjoint':>12s} {'+multistart':>12s} {'+ESOP':>12s}  {'PKRM':>10s} {'PPRM':>10s}  "
+          f"{'ESOP no der.':>12s} {'ESOP + der.':>12s}  ESOP pick")
     for r in bench:
         t = lambda k: (lambda g: f"{len(g)}/{sum(map(qcost, g))}")(cancel_xx(tw[(r['name'], k)])) if (r['name'], k) in tw else '-'
         f = lambda s: f"{s[0]}/{s[1]}"
-        print(f"{r['name']:15s} {f(r['paper']):>12s} {f(r['multistart'][0]):>12s} {f(r['esop'][0]):>12s}  "
-              f"{t('pkrm'):>10s} {t('pprm'):>10s}  {r['esop'][1]}")
-    live = [r for r in rand if r['paper'][0]]
+        print(f"{r['name']:15s} {f(r['disjoint']):>12s} {f(r['multistart'][0]):>12s} {f(r['esop'][0]):>12s}  "
+              f"{t('pkrm'):>10s} {t('pprm'):>10s}  {f(r['esop_noderiv']):>12s} {f(r['esop_deriv']):>12s}  {r['esop'][1]}")
+    live = [r for r in rand if r['disjoint'][0]]
     for k, label in (('multistart', 'multistart only (disjoint, proof intact)'), ('esop', 'multistart + ESOP')):
-        better = [r for r in live if r[k][0] < r['paper']]
-        red = [1 - r[k][0][0] / r['paper'][0] for r in live]
-        qred = [1 - r[k][0][1] / r['paper'][1] for r in live]
-        assert all(r[k][0][0] <= r['paper'][0] and r[k][0][1] <= r['paper'][1] for r in rand)
+        better = [r for r in live if r[k][0] < r['disjoint']]
+        red = [1 - r[k][0][0] / r['disjoint'][0] for r in live]
+        qred = [1 - r[k][0][1] / r['disjoint'][1] for r in live]
+        assert all(r[k][0][0] <= r['disjoint'][0] and r[k][0][1] <= r['disjoint'][1] for r in rand)
         print(f"\n== {len(rand)} random truth tables (randcheck.py's set), {label} ==")
         print(f"improved {len(better)} of {len(live)} non-empty tables ({100 * len(better) / len(live):.1f}%); "
               f"mean gate reduction {100 * sum(red) / len(red):.1f}%, mean quantum-cost reduction "
               f"{100 * sum(qred) / len(qred):.1f}%; worse on none (checked)")
+        if k == 'esop':
+            used = sum(r[k][1].startswith('esop') for r in live)
+            print(f"the pick uses an ESOP cover in {used} of {len(live)} ({100 * used / len(live):.1f}%)")
     return bench, rand
 
 if __name__ == '__main__':

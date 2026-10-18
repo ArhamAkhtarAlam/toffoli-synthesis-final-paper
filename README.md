@@ -16,10 +16,10 @@ ICEE 2026 paper (#1571351401) and the reference code behind its numbers.
 - `code/baselines.py` - runs tweedledum on every benchmark (tweedledum columns); writes `code/results/tweedledum_circuits.json`
 - `code/device.py` - transpiles our and tweedledum's circuits to IBM's FakeTorino device model and checks each by statevector simulation (CZ columns); output in `code/results/device_torino.txt`
 
-Beyond the paper (no number in the paper comes from these):
+The hybrid (overlapping covers, selection by CZ count):
 
-- `code/improve.py` - optional improvement layer: other disjoint covers (other seeds and variable orders) and overlapping XOR (ESOP) covers from every fixed-polarity Reed-Muller form, each run through the same pipeline and checked on all inputs; the paper's circuit is kept unless a candidate has no more gates and no higher quantum cost. Output in `code/results/improve.txt`
-- `code/improve_device.py` - transpiles those candidates like `device.py` and keeps the one with the fewest CZ gates (the paper's circuit is a candidate, so never worse on the device). Output in `code/results/device_torino_improved.txt`
+- `code/improve.py` - the hybrid's candidates: other disjoint covers (other seeds and variable orders) and overlapping XOR (ESOP) covers from every fixed-polarity Reed-Muller form, each run through the same pipeline and checked on all inputs; the disjoint pipeline's circuit is kept unless a candidate has no more gates and no higher quantum cost. Output in `code/results/improve.txt`
+- `code/improve_device.py` - transpiles those candidates like `device.py` and keeps the one with the fewest CZ gates (the disjoint pipeline's circuit is a candidate, so never worse on the device); the Hyb. columns of Table I. Output in `code/results/device_torino_improved.txt`
 
 Run `cd code && python3 recompute.py && python3 randcheck.py`.
 

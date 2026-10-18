@@ -1,19 +1,21 @@
-== Benchmarks: gates / quantum cost after X-cancellation (never worse than the paper's) ==
-function               paper  +multistart        +ESOP        PKRM       PPRM  ESOP pick
-AND                      1/5          1/5          1/5         1/5        1/5  paper
-OR                       4/8          4/8          3/7         4/8        3/7  esop-gates
-XOR                     6/14         6/14          2/2         2/2        2/2  esop-gates
-NAND                    6/10         6/10          2/6        6/10        2/6  esop-gates
-Half adder              6/14         6/14          3/7         3/7        3/7  esop-gates
-Full adder             14/74        13/53         6/18       10/22       6/18  esop-gates
-2b ripple             31/411       29/377       16/104      34/142     18/118  esop-gates
-BCD-XS3               22/190       21/169       19/127      45/257     32/292  esopm-qcost
-3x3 mult             60/1920      56/1604       25/769      80/936     27/919  esop-gates
-4b comparator        52/8180      52/8180       24/472      24/472    81/1009  esop-gates
-3_17                   13/37        13/37        12/28       15/31      14/30  esop-gates
+== Benchmarks: gates / quantum cost after X-cancellation (never worse than the disjoint pipeline's) ==
+(ESOP no der. / + der.: the gate-count ESOP cover alone, without and with derivation)
+function            disjoint  +multistart        +ESOP        PKRM       PPRM  ESOP no der.  ESOP + der.  ESOP pick
+AND                      1/5          1/5          1/5         1/5        1/5           1/5          1/5  disjoint
+OR                       4/8          4/8          3/7         4/8        3/7           3/7          3/7  esop-gates
+XOR                     6/14         6/14          2/2         2/2        2/2           2/2          2/2  esop-gates
+NAND                    6/10         6/10          2/6        6/10        2/6           2/6          2/6  esop-gates
+Half adder              6/14         6/14          3/7         3/7        3/7           3/7          3/7  esop-gates
+Full adder             14/74        13/53         6/18       10/22       6/18          6/18         6/18  esop-gates
+2b ripple             31/411       29/377       16/104      34/142     18/118        18/118       16/104  esop-gates
+BCD-XS3               22/190       21/169       19/127      45/257     32/292        24/212       21/157  esopm-qcost
+3x3 mult             60/1920      56/1604       25/769      80/936     27/919        27/919       25/769  esop-gates
+4b comparator        52/8180      52/8180       24/472      24/472    81/1009        24/472       24/472  esop-gates
+3_17                   13/37        13/37        12/28       15/31      14/30         14/30        12/28  esop-gates
 
 == 2000 random truth tables (randcheck.py's set), multistart only (disjoint, proof intact) ==
 improved 212 of 1907 non-empty tables (11.1%); mean gate reduction 1.1%, mean quantum-cost reduction 2.4%; worse on none (checked)
 
 == 2000 random truth tables (randcheck.py's set), multistart + ESOP ==
 improved 1455 of 1907 non-empty tables (76.3%); mean gate reduction 22.6%, mean quantum-cost reduction 25.1%; worse on none (checked)
+the pick uses an ESOP cover in 1447 of 1907 (75.9%)

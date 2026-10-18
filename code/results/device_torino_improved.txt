@@ -1,7 +1,7 @@
 CZ gates on FakeTorino (optimization_level=3, seed 0, qubits_initially_zero=False)
-function        paper  improve  CZ pick   PKRM   PPRM  CZ pick: circuit, check
-AND                 7        7        7      7      7  paper: 1 gates, Q 5, depth 30; 4 inputs (all) simulated
-OR                  7        9        7     10      8  paper: 4 gates, Q 8, depth 29; 4 inputs (all) simulated
+function        disj.  improve  CZ pick   PKRM   PPRM  CZ pick: circuit, check
+AND                 7        7        7      7      7  disjoint: 1 gates, Q 5, depth 30; 4 inputs (all) simulated
+OR                  7        9        7     10      8  disjoint: 4 gates, Q 8, depth 29; 4 inputs (all) simulated
 XOR                17        2        2      2      2  esop-gates: 2 gates, Q 2, depth 7; 4 inputs (all) simulated
 NAND                7        7        7      8      7  esop-gates: 2 gates, Q 6, depth 31; 4 inputs (all) simulated
 Half adder         19       12       12     14     14  esop-gates: 3 gates, Q 7, depth 40; 4 inputs (all) simulated
