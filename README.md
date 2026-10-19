@@ -4,6 +4,7 @@ ICEE 2026 paper (#1571351401) and the reference code behind its numbers.
 
 - `paper/toffoli_synthesis.tex` - IEEEtran conference source (`pdflatex` twice; needs `IEEEtran.cls`, `quantikz`)
 - `paper/toffoli_synthesis.pdf` - compiled PDF (4 pages, ICEE proceedings limit)
+- `paper/toffoli_synthesis_reviewed.tex` / `.pdf` - the version as reviewed (disjoint covers only), with the acknowledgment
 - `paper/toffoli_synthesis_extended.tex` - longer 7-page version with full proofs and discussion
 - `code/disjoint_synth.py` - DisjointCover / GrowCube, benchmark truth tables
 - `code/gatelevel.py` - gate emission and the X-X cancellation pass, classical-replay verifier
